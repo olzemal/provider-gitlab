@@ -23,6 +23,7 @@ import (
 	"github.com/crossplane-contrib/provider-gitlab/apis/groups/v1alpha1"
 
 	"github.com/crossplane/crossplane-runtime/pkg/reference"
+	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -162,5 +163,82 @@ func (mg *Variable) ResolveReferences(ctx context.Context, c client.Reader) erro
 	mg.Spec.ForProvider.ProjectID = toPtrValue(rsp.ResolvedValue)
 	mg.Spec.ForProvider.ProjectIDRef = rsp.ResolvedReference
 
+	return nil
+}
+
+// ResolveReferences of this protected branch
+func (mg *ProtectedBranch) ResolveReferences(ctx context.Context, c client.Reader) error {
+	r := reference.NewAPIResolver(c, mg)
+
+	// resolve spec.forProvider.projectIdRef
+	rsp, err := r.Resolve(ctx, reference.ResolutionRequest{
+		CurrentValue: fromPtrValue(mg.Spec.ForProvider.ProjectID),
+		Reference:    mg.Spec.ForProvider.ProjectIDRef,
+		Selector:     mg.Spec.ForProvider.ProjectIDSelector,
+		To:           reference.To{Managed: &Project{}, List: &ProjectList{}},
+		Extract:      reference.ExternalName(),
+	})
+
+	if err != nil {
+		return errors.Wrap(err, "spec.forProvider.projectId")
+	}
+
+	mg.Spec.ForProvider.ProjectID = toPtrValue(rsp.ResolvedValue)
+	mg.Spec.ForProvider.ProjectIDRef = rsp.ResolvedReference
+
+	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToPush)
+	if err != nil {
+		return errors.Wrap(err, "spec.forProvider.allowedToPush")
+	}
+	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToMerge)
+	if err != nil {
+		return errors.Wrap(err, "spec.forProvider.allowedToMerge")
+	}
+	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToUnprotect)
+	if err != nil {
+		return errors.Wrap(err, "spec.forProvider.allowedToUnprotect")
+	}
+
+	return nil
+}
+
+func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg resource.Managed, opts *[]*BranchPermissionOptions) error {
+	if opts == nil {
+		return nil
+	}
+	newOpts := *opts
+	r := reference.NewAPIResolver(c, mg)
+	for i, item := range *opts {
+		if item.GroupIDRef != nil {
+			rsp, err := r.Resolve(ctx, reference.ResolutionRequest{
+				CurrentValue: fromPtrValue(item.GroupID),
+				Reference:    item.GroupIDRef,
+				Selector:     item.GroupIDSelector,
+				To:           reference.To{Managed: &v1alpha1.Group{}, List: &v1alpha1.GroupList{}},
+				Extract:      reference.ExternalName(),
+			})
+			if err != nil {
+				return errors.Wrap(err, item.GroupIDRef.Name)
+			}
+			item.GroupID = toPtrValue(rsp.ResolvedValue)
+			item.GroupIDRef = rsp.ResolvedReference
+		}
+		if item.DeployKeyIDRef != nil {
+			rsp, err := r.Resolve(ctx, reference.ResolutionRequest{
+				CurrentValue: fromPtrValue(item.DeployKeyID),
+				Reference:    item.DeployKeyIDRef,
+				Selector:     item.DeployKeyIDSelector,
+				To:           reference.To{Managed: &v1alpha1.DeployToken{}, List: &v1alpha1.DeployTokenList{}},
+				Extract:      reference.ExternalName(),
+			})
+			if err != nil {
+				return errors.Wrap(err, item.DeployKeyIDRef.Name)
+			}
+			item.DeployKeyID = toPtrValue(rsp.ResolvedValue)
+			item.DeployKeyIDRef = rsp.ResolvedReference
+		}
+		newOpts[i] = item
+	}
+	opts = &newOpts
 	return nil
 }

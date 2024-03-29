@@ -101,6 +101,14 @@ var (
 	PipelineScheduleGroupVersionKind = SchemeGroupVersion.WithKind(PipelineScheduleKind)
 )
 
+// ProtectedBranch type metadata
+var (
+	ProtectedBranchKind             = reflect.TypeOf(ProtectedBranch{}).Name()
+	ProtectedBranchGroupKind        = schema.GroupKind{Group: Group, Kind: ProtectedBranchKind}.String()
+	ProtectedBranchKindAPIVersion   = ProtectedBranchKind + "." + SchemeGroupVersion.String()
+	ProtectedBranchGroupVersionKind = SchemeGroupVersion.WithKind(ProtectedBranchKind)
+)
+
 func init() {
 	SchemeBuilder.Register(&Project{}, &ProjectList{})
 	SchemeBuilder.Register(&Hook{}, &HookList{})
@@ -110,4 +118,5 @@ func init() {
 	SchemeBuilder.Register(&DeployKey{}, &DeployKeyList{})
 	SchemeBuilder.Register(&AccessToken{}, &AccessTokenList{})
 	SchemeBuilder.Register(&PipelineSchedule{}, &PipelineScheduleList{})
+	SchemeBuilder.Register(&ProtectedBranch{}, &ProtectedBranchList{})
 }
