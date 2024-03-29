@@ -69,6 +69,7 @@ spec:
                 properties:
                   AllowedToUnprotect:
                     items:
+                      description: BranchPermissionOptions defines a Permission.
                       properties:
                         access_level:
                           description: "AccessLevelValue represents a permission level
@@ -238,6 +239,7 @@ spec:
                     type: boolean
                   allowedToMerge:
                     items:
+                      description: BranchPermissionOptions defines a Permission.
                       properties:
                         access_level:
                           description: "AccessLevelValue represents a permission level
@@ -405,6 +407,7 @@ spec:
                     type: array
                   allowedToPush:
                     items:
+                      description: BranchPermissionOptions defines a Permission.
                       properties:
                         access_level:
                           description: "AccessLevelValue represents a permission level

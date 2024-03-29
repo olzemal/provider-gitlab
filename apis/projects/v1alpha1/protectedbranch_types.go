@@ -43,6 +43,7 @@ type ProtectedBranchParameters struct {
 	CodeOwnerApprovalRequired *bool `json:"codeOwnerApprovalRequired,omitempty"`
 }
 
+// BranchPermissionOptions defines a Permission.
 type BranchPermissionOptions struct {
 	UserID *int `url:"user_id,omitempty" json:"user_id,omitempty"`
 

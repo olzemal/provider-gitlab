@@ -186,29 +186,34 @@ func (mg *ProtectedBranch) ResolveReferences(ctx context.Context, c client.Reade
 	mg.Spec.ForProvider.ProjectID = toPtrValue(rsp.ResolvedValue)
 	mg.Spec.ForProvider.ProjectIDRef = rsp.ResolvedReference
 
-	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToPush)
+	resolvedPush, err := resolveBranchPermissionOptions(ctx, c, mg, mg.Spec.ForProvider.AllowedToPush)
 	if err != nil {
 		return errors.Wrap(err, "spec.forProvider.allowedToPush")
 	}
-	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToMerge)
+	mg.Spec.ForProvider.AllowedToPush = resolvedPush
+
+	resolvedMerge, err := resolveBranchPermissionOptions(ctx, c, mg, mg.Spec.ForProvider.AllowedToMerge)
 	if err != nil {
 		return errors.Wrap(err, "spec.forProvider.allowedToMerge")
 	}
-	err = resolveBranchPermissionOptions(ctx, c, mg, &mg.Spec.ForProvider.AllowedToUnprotect)
+	mg.Spec.ForProvider.AllowedToMerge = resolvedMerge
+
+	resolvedUnprotect, err := resolveBranchPermissionOptions(ctx, c, mg, mg.Spec.ForProvider.AllowedToUnprotect)
 	if err != nil {
 		return errors.Wrap(err, "spec.forProvider.allowedToUnprotect")
 	}
+	mg.Spec.ForProvider.AllowedToUnprotect = resolvedUnprotect
 
 	return nil
 }
 
-func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg resource.Managed, opts *[]*BranchPermissionOptions) error {
+func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg resource.Managed, opts []*BranchPermissionOptions) ([]*BranchPermissionOptions, error) {
 	if opts == nil {
-		return nil
+		return nil, nil
 	}
-	newOpts := *opts
+	newOpts := []*BranchPermissionOptions{}
 	r := reference.NewAPIResolver(c, mg)
-	for i, item := range *opts {
+	for i, item := range opts {
 		if item.GroupIDRef != nil {
 			rsp, err := r.Resolve(ctx, reference.ResolutionRequest{
 				CurrentValue: fromPtrValue(item.GroupID),
@@ -218,7 +223,7 @@ func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg res
 				Extract:      reference.ExternalName(),
 			})
 			if err != nil {
-				return errors.Wrap(err, item.GroupIDRef.Name)
+				return nil, errors.Wrap(err, item.GroupIDRef.Name)
 			}
 			item.GroupID = toPtrValue(rsp.ResolvedValue)
 			item.GroupIDRef = rsp.ResolvedReference
@@ -232,13 +237,12 @@ func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg res
 				Extract:      reference.ExternalName(),
 			})
 			if err != nil {
-				return errors.Wrap(err, item.DeployKeyIDRef.Name)
+				return nil, errors.Wrap(err, item.DeployKeyIDRef.Name)
 			}
 			item.DeployKeyID = toPtrValue(rsp.ResolvedValue)
 			item.DeployKeyIDRef = rsp.ResolvedReference
 		}
 		newOpts[i] = item
 	}
-	opts = &newOpts
-	return nil
+	return newOpts, nil
 }

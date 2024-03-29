@@ -3,14 +3,16 @@ package projects
 import (
 	"slices"
 
-	"github.com/crossplane-contrib/provider-gitlab/apis/projects/v1alpha1"
-	"github.com/crossplane-contrib/provider-gitlab/pkg/clients"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/xanzy/go-gitlab"
+
+	"github.com/crossplane-contrib/provider-gitlab/apis/projects/v1alpha1"
+	"github.com/crossplane-contrib/provider-gitlab/pkg/clients"
 )
 
+// ProtectedBranchClient defines GitLab protected branch service operations
 type ProtectedBranchClient interface {
 	GetProtectedBranch(pid interface{}, branch string, options ...gitlab.RequestOptionFunc) (*gitlab.ProtectedBranch, *gitlab.Response, error)
 	ProtectRepositoryBranches(pid interface{}, opt *gitlab.ProtectRepositoryBranchesOptions, options ...gitlab.RequestOptionFunc) (*gitlab.ProtectedBranch, *gitlab.Response, error)
@@ -18,11 +20,13 @@ type ProtectedBranchClient interface {
 	UnprotectRepositoryBranches(pid interface{}, branch string, options ...gitlab.RequestOptionFunc) (*gitlab.Response, error)
 }
 
+// NewProtectedBranchClient returns a new GitLab protected branch service
 func NewProtectedBranchClient(cfg clients.Config) ProtectedBranchClient {
 	git := clients.NewClient(cfg)
 	return git.ProtectedBranches
 }
 
+// LateInitializeProtectedBranch fills the empty variables in the parameters with the values seen in gitlab.ProtectedBranch
 func LateInitializeProtectedBranch(p *v1alpha1.ProtectedBranchParameters, g *gitlab.ProtectedBranch) {
 	if p.ID == nil {
 		p.ID = &g.ID
@@ -49,6 +53,7 @@ func LateInitializeProtectedBranch(p *v1alpha1.ProtectedBranchParameters, g *git
 	}
 }
 
+// GenerateProtectRepositoryBranchesOptions generates a GitLab API struct from our internal version.
 func GenerateProtectRepositoryBranchesOptions(p *v1alpha1.ProtectedBranchParameters) *gitlab.ProtectRepositoryBranchesOptions {
 	return &gitlab.ProtectRepositoryBranchesOptions{
 		Name:                      &p.Name,
@@ -60,6 +65,7 @@ func GenerateProtectRepositoryBranchesOptions(p *v1alpha1.ProtectedBranchParamet
 	}
 }
 
+// GenerateUpdateProtectedBranchOptions generates a GitLab API struct from our internal version.
 func GenerateUpdateProtectedBranchOptions(p *v1alpha1.ProtectedBranchParameters) *gitlab.UpdateProtectedBranchOptions {
 	return &gitlab.UpdateProtectedBranchOptions{
 		Name:                      &p.Name,
@@ -71,32 +77,32 @@ func GenerateUpdateProtectedBranchOptions(p *v1alpha1.ProtectedBranchParameters)
 	}
 }
 
+// GenerateBranchPermissionOptions generates a GitLab API struct from our internal version.
 func GenerateBranchPermissionOptions(in []*v1alpha1.BranchPermissionOptions) *[]*gitlab.BranchPermissionOptions {
 	o := []*gitlab.BranchPermissionOptions{}
+	id := 1 // Indexing starts with 1 here (https://docs.gitlab.com/ee/api/protected_branches.html#example-with-user--group-level-access)
 	for _, item := range in {
+		id++
 		o = append(o, &gitlab.BranchPermissionOptions{
+			ID:          &id,
 			UserID:      item.UserID,
 			GroupID:     item.GroupID,
 			DeployKeyID: item.DeployKeyID,
 			AccessLevel: (*gitlab.AccessLevelValue)(item.AccessLevel),
 		})
 	}
+
+	// Delete the next Permissions
+	t := true
+	for ; id < 100; id++ {
+		o = append(o, &gitlab.BranchPermissionOptions{
+			Destroy: &t,
+		})
+	}
 	return &o
 }
 
-func GenerateProviderBranchPermissionOptions(in []*gitlab.BranchPermissionOptions) []*v1alpha1.BranchPermissionOptions {
-	o := []*v1alpha1.BranchPermissionOptions{}
-	for _, item := range in {
-		o = append(o, &v1alpha1.BranchPermissionOptions{
-			UserID:      item.UserID,
-			GroupID:     item.GroupID,
-			DeployKeyID: item.DeployKeyID,
-			AccessLevel: (*v1alpha1.AccessLevelValue)(item.AccessLevel),
-		})
-	}
-	return o
-}
-
+// IsProtectedBranchUpToDate checks if the given parameters are equal, ignoring references and the ProjectID.
 func IsProtectedBranchUpToDate(p *v1alpha1.ProtectedBranchParameters, g *gitlab.ProtectedBranch) bool {
 	if p == nil {
 		return true
@@ -110,6 +116,7 @@ func IsProtectedBranchUpToDate(p *v1alpha1.ProtectedBranchParameters, g *gitlab.
 	)
 }
 
+// ProtectedBranchToParameters generates a Parameter struct from a GitLab API ProtectedBranch
 func ProtectedBranchToParameters(in gitlab.ProtectedBranch) v1alpha1.ProtectedBranchParameters {
 	return v1alpha1.ProtectedBranchParameters{
 		ID:                        &in.ID,
@@ -133,22 +140,18 @@ func accessLevelsToBranchPermissionOptionsList(in []*gitlab.BranchAccessDescript
 		return 0
 	})
 
-	o := []*v1alpha1.BranchPermissionOptions{}
-	for _, i := range in {
-		o = append(o, accessLevelToBranchPermissionOptions(i))
+	out := []*v1alpha1.BranchPermissionOptions{}
+	for _, d := range in {
+		o := v1alpha1.BranchPermissionOptions{
+			GroupID:     &d.GroupID,
+			AccessLevel: (*v1alpha1.AccessLevelValue)(&d.AccessLevel),
+		}
+		if d.AccessLevelDescription == "Deploy key" {
+			o.DeployKeyID = &d.UserID
+		} else {
+			o.UserID = &d.UserID
+		}
+		out = append(out, &o)
 	}
-	return o
-}
-
-func accessLevelToBranchPermissionOptions(in *gitlab.BranchAccessDescription) *v1alpha1.BranchPermissionOptions {
-	o := v1alpha1.BranchPermissionOptions{
-		GroupID:     &in.GroupID,
-		AccessLevel: (*v1alpha1.AccessLevelValue)(&in.AccessLevel),
-	}
-	if in.AccessLevelDescription == "Deploy key" {
-		o.DeployKeyID = &in.UserID
-	} else {
-		o.UserID = &in.UserID
-	}
-	return &o
+	return out
 }
