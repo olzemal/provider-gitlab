@@ -213,7 +213,7 @@ func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg res
 	}
 	newOpts := []*BranchPermissionOptions{}
 	r := reference.NewAPIResolver(c, mg)
-	for i, item := range opts {
+	for _, item := range opts {
 		if item.GroupIDRef != nil {
 			rsp, err := r.Resolve(ctx, reference.ResolutionRequest{
 				CurrentValue: fromPtrValue(item.GroupID),
@@ -242,7 +242,7 @@ func resolveBranchPermissionOptions(ctx context.Context, c client.Reader, mg res
 			item.DeployKeyID = toPtrValue(rsp.ResolvedValue)
 			item.DeployKeyIDRef = rsp.ResolvedReference
 		}
-		newOpts[i] = item
+		newOpts = append(newOpts, item)
 	}
 	return newOpts, nil
 }
