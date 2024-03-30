@@ -126,7 +126,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	cr.Status.SetConditions(xpv1.Creating())
-	_, _, err := e.client.ProtectRepositoryBranches(
+	rsp, _, err := e.client.ProtectRepositoryBranches(
 		*cr.Spec.ForProvider.ProjectID,
 		projects.GenerateProtectRepositoryBranchesOptions(&cr.Spec.ForProvider),
 		gitlab.WithContext(ctx),
@@ -134,6 +134,9 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if err != nil {
 		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
+
+	cr.Spec.ForProvider.ID = &rsp.ID
+
 	return managed.ExternalCreation{}, nil
 }
 
