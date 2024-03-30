@@ -80,23 +80,14 @@ func GenerateUpdateProtectedBranchOptions(p *v1alpha1.ProtectedBranchParameters)
 // GenerateBranchPermissionOptions generates a GitLab API struct from our internal version.
 func GenerateBranchPermissionOptions(in []*v1alpha1.BranchPermissionOptions) *[]*gitlab.BranchPermissionOptions {
 	o := []*gitlab.BranchPermissionOptions{}
-	id := 1 // Indexing starts with 1 here (https://docs.gitlab.com/ee/api/protected_branches.html#example-with-user--group-level-access)
-	for _, item := range in {
-		id++
+	for i, item := range in {
+		id := i + 1 // Indexing starts with 1 here (https://docs.gitlab.com/ee/api/protected_branches.html#example-with-user--group-level-access)
 		o = append(o, &gitlab.BranchPermissionOptions{
 			ID:          &id,
 			UserID:      item.UserID,
 			GroupID:     item.GroupID,
 			DeployKeyID: item.DeployKeyID,
 			AccessLevel: (*gitlab.AccessLevelValue)(item.AccessLevel),
-		})
-	}
-
-	// Delete the next Permissions
-	t := true
-	for ; id < 100; id++ {
-		o = append(o, &gitlab.BranchPermissionOptions{
-			Destroy: &t,
 		})
 	}
 	return &o
