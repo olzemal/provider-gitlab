@@ -1,0 +1,12 @@
+---
+apiVersion: projects.gitlab.crossplane.io/v1alpha1
+kind: ProtectedBranch
+metadata:
+  name: example-protectedbranch
+spec:
+  forProvider:
+    projectIdRef:
+      name: example-project
+    name: "main"
+  providerConfigRef:
+    name: gitlab-provider
